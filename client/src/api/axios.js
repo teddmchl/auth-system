@@ -23,6 +23,11 @@ const api = axios.create({
 
 let isRefreshing = false;
 let failedQueue = []; // [{ resolve, reject }]
+let memoryToken = null;
+
+export const setMemoryToken = (token) => {
+  memoryToken = token;
+};
 
 const flushQueue = (error, token = null) => {
   failedQueue.forEach(({ resolve, reject }) => {
@@ -35,9 +40,8 @@ const flushQueue = (error, token = null) => {
 /* ── Request interceptor: attach access token ── */
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (memoryToken) {
+      config.headers.Authorization = `Bearer ${memoryToken}`;
     }
     return config;
   },
@@ -81,7 +85,8 @@ api.interceptors.response.use(
       const { data } = await api.post("/auth/refresh");
       const newToken = data.accessToken;
 
-      localStorage.setItem("accessToken", newToken);
+      // Set the in-memory token directly
+      setMemoryToken(newToken);
 
       // Update the Authorization header for the axios default headers too
       api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
@@ -95,7 +100,7 @@ api.interceptors.response.use(
     } catch (refreshError) {
       // Refresh failed — clear everything and notify queued requests
       flushQueue(refreshError, null);
-      localStorage.removeItem("accessToken");
+      setMemoryToken(null);
 
       // Dispatch a custom event so AuthContext can update state
       window.dispatchEvent(new CustomEvent("auth:logout"));

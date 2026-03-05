@@ -13,7 +13,7 @@ const {
   getRefreshTokenExpiry,
   generateResetToken,
 } = require("../utils/tokens");
-const { sendPasswordResetEmail } = require("../utils/email");
+const { sendPasswordResetEmail, sendVerificationEmail } = require("../utils/email");
 const bcrypt = require("bcryptjs"); // for dummy hash timing mitigation
 
 /* ── Rate limiters ── */
@@ -77,7 +77,14 @@ router.post("/register", authLimiter, async (req, res) => {
       return res.status(409).json({ error: "An account with this email already exists" });
     }
 
-    const user = await User.create({ name, email, password });
+    const verificationToken = generateResetToken();
+    const user = await User.create({ name, email, password, verificationToken });
+
+    try {
+      await sendVerificationEmail(user.email, verificationToken, user.name);
+    } catch (err) {
+      console.error("[register] Email send failed:", err);
+    }
 
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
@@ -354,6 +361,57 @@ router.post("/reset-password/:token", async (req, res) => {
   } catch (err) {
     console.error("[reset-password]", err);
     res.status(500).json({ error: "Password reset failed" });
+  }
+});
+
+/* ─────────────────────────────────────────
+   GET /api/auth/verify-email/:token
+───────────────────────────────────────── */
+router.get("/verify-email/:token", async (req, res) => {
+  try {
+    const user = await User.findOne({ verificationToken: req.params.token });
+    if (!user) {
+      return res.status(400).json({ error: "Invalid or expired verification link" });
+    }
+
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    await user.save();
+
+    res.json({ message: "Email verified successfully" });
+  } catch (err) {
+    console.error("[verify-email]", err);
+    res.status(500).json({ error: "Verification failed" });
+  }
+});
+
+/* ─────────────────────────────────────────
+   POST /api/auth/change-password
+───────────────────────────────────────── */
+router.post("/change-password", requireAuth, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    if (!oldPassword || !newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: "Valid old and new passwords are required" });
+    }
+
+    const user = await User.findById(req.user._id).select("+password");
+    const isMatch = await user.comparePassword(oldPassword);
+    if (!isMatch) {
+      return res.status(401).json({ error: "Incorrect current password" });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    // Revoke all other sessions
+    await RefreshToken.deleteMany({ user: user._id });
+    clearRefreshCookie(res);
+
+    res.json({ message: "Password updated successfully. Other sessions revoked." });
+  } catch (err) {
+    console.error("[change-password]", err);
+    res.status(500).json({ error: "Failed to update password" });
   }
 });
 
