@@ -21,7 +21,12 @@ mongoose
 app.use(helmet());
 app.use(
   cors({
-    origin: [process.env.CLIENT_URL, "http://localhost:5173", "https://teddonyesero.vercel.app"].filter(Boolean),
+    origin: [
+      process.env.CLIENT_URL,
+      "http://localhost:5173",
+      "https://teddonyesero.vercel.app",
+      "https://auth-system-lilac.vercel.app"
+    ].filter(Boolean),
     credentials: true, // allow cookies
   })
 );
