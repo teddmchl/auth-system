@@ -80,11 +80,9 @@ router.post("/register", authLimiter, async (req, res) => {
     const verificationToken = generateResetToken();
     const user = await User.create({ name, email, password, verificationToken });
 
-    try {
-      await sendVerificationEmail(user.email, verificationToken, user.name);
-    } catch (err) {
-      console.error("[register] Email send failed:", err);
-    }
+    // Send verification email in background so it doesn't block response
+    sendVerificationEmail(user.email, verificationToken, user.name)
+      .catch(err => console.error("[register] Email send failed:", err));
 
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
@@ -139,7 +137,8 @@ router.post("/login", authLimiter, async (req, res) => {
     const user = await User.findOne({ email: email.toLowerCase() }).select("+password");
     if (!user) {
       // Run dummy hash to mitigate timing attacks (email enumeration)
-      await bcrypt.hash(password, 12);
+      // Salt rounds reduced to 10 for better performance on shared CPU hosting
+      await bcrypt.hash(password, 10);
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
@@ -315,7 +314,9 @@ router.post("/forgot-password", forgotLimiter, async (req, res) => {
     user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
     await user.save({ validateBeforeSave: false });
 
-    await sendPasswordResetEmail(user.email, rawToken, user.name);
+    // Send email in background
+    sendPasswordResetEmail(user.email, rawToken, user.name)
+      .catch(err => console.error("[forgot-password] Email failed:", err));
 
     res.json({ message: "If that email exists, a reset link has been sent." });
   } catch (err) {
