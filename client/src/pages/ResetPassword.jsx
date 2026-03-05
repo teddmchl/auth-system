@@ -59,16 +59,16 @@ export default function ResetPassword() {
           <div className="field">
             <label className="field-label" htmlFor="password">New password</label>
             <input
-              id="password" name="password" type="password" required
+              id="password" name="password" type="password" required minLength={8} maxLength={100}
               value={form.password} onChange={handleChange}
               className="field-input" placeholder="Min. 8 characters"
               autoComplete="new-password"
             />
           </div>
           <div className="field">
-            <label className="field-label" htmlFor="confirm">Confirm password</label>
+            <label className="field-label" htmlFor="confirm">Confirm new password</label>
             <input
-              id="confirm" name="confirm" type="password" required
+              id="confirm" name="confirm" type="password" required maxLength={100}
               value={form.confirm} onChange={handleChange}
               className={`field-input ${form.confirm && form.confirm !== form.password ? "input-error" : ""}`}
               placeholder="Repeat password"

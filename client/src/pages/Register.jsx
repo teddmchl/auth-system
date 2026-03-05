@@ -64,7 +64,7 @@ export default function Register() {
           <div className="field">
             <label className="field-label" htmlFor="name">Full name</label>
             <input
-              id="name" name="name" type="text" required
+              id="name" name="name" type="text" required maxLength={60}
               value={form.name} onChange={handleChange}
               className="field-input" placeholder="Jane Smith"
               autoComplete="name"
@@ -74,7 +74,7 @@ export default function Register() {
           <div className="field">
             <label className="field-label" htmlFor="email">Email</label>
             <input
-              id="email" name="email" type="email" required
+              id="email" name="email" type="email" required maxLength={254}
               value={form.email} onChange={handleChange}
               className="field-input" placeholder="jane@example.com"
               autoComplete="email"
@@ -84,7 +84,7 @@ export default function Register() {
           <div className="field">
             <label className="field-label" htmlFor="password">Password</label>
             <input
-              id="password" name="password" type="password" required
+              id="password" name="password" type="password" required maxLength={100}
               value={form.password} onChange={handleChange}
               className="field-input" placeholder="Min. 8 characters"
               autoComplete="new-password"
@@ -92,7 +92,7 @@ export default function Register() {
             {form.password && (
               <div className="strength-row">
                 <div className="strength-bar">
-                  {[1,2,3,4,5].map((i) => (
+                  {[1, 2, 3, 4, 5].map((i) => (
                     <div
                       key={i}
                       className="strength-seg"
@@ -108,7 +108,7 @@ export default function Register() {
           <div className="field">
             <label className="field-label" htmlFor="confirm">Confirm password</label>
             <input
-              id="confirm" name="confirm" type="password" required
+              id="confirm" name="confirm" type="password" required maxLength={100}
               value={form.confirm} onChange={handleChange}
               className={`field-input ${form.confirm && form.confirm !== form.password ? "input-error" : ""}`}
               placeholder="Repeat password"

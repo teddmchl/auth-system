@@ -14,6 +14,7 @@ const {
   generateResetToken,
 } = require("../utils/tokens");
 const { sendPasswordResetEmail } = require("../utils/email");
+const bcrypt = require("bcryptjs"); // for dummy hash timing mitigation
 
 /* ── Rate limiters ── */
 const authLimiter = rateLimit({
@@ -34,8 +35,8 @@ const forgotLimiter = rateLimit({
 const setRefreshCookie = (res, token) => {
   res.cookie("refreshToken", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: true, // required for sameSite: "none"
+    sameSite: "none", // required for Render api -> Vercel client
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: "/api/auth/refresh", // only sent to refresh endpoint
   });
@@ -43,7 +44,11 @@ const setRefreshCookie = (res, token) => {
 
 /* ── Helper: clear refresh token cookie ── */
 const clearRefreshCookie = (res) => {
-  res.clearCookie("refreshToken", { path: "/api/auth/refresh" });
+  res.clearCookie("refreshToken", { 
+    path: "/api/auth/refresh",
+    sameSite: "none",
+    secure: true
+  });
 };
 
 /* ─────────────────────────────────────────
@@ -53,8 +58,14 @@ router.post("/register", authLimiter, async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
+    if (typeof name !== "string" || typeof email !== "string" || typeof password !== "string") {
+      return res.status(400).json({ error: "Invalid input format" });
+    }
     if (!name || !email || !password) {
       return res.status(400).json({ error: "Name, email, and password are required" });
+    }
+    if (name.length > 60 || email.length > 254 || password.length > 100) {
+      return res.status(400).json({ error: "Input length exceeded" });
     }
     if (password.length < 8) {
       return res.status(400).json({ error: "Password must be at least 8 characters" });
@@ -108,13 +119,20 @@ router.post("/login", authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    if (typeof email !== "string" || typeof password !== "string") {
+      return res.status(400).json({ error: "Invalid input format" });
+    }
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
+    if (email.length > 254 || password.length > 100) {
+      return res.status(400).json({ error: "Input length exceeded" });
+    }
 
-    // Explicitly select password (hidden by default)
     const user = await User.findOne({ email: email.toLowerCase() }).select("+password");
     if (!user) {
+      // Run dummy hash to mitigate timing attacks (email enumeration)
+      await bcrypt.hash(password, 12);
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
